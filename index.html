@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bloxd Tier Test Calculator</title>
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg, #1e1e2f, #27293d);
+      color: #f5f5f5;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 40px;
+    }
+    .container {
+      background: #2e3047;
+      border-radius: 16px;
+      padding: 30px;
+      width: 100%;
+      max-width: 600px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    }
+    h1 {
+      text-align: center;
+      color: #00aaff;
+      margin-bottom: 25px;
+    }
+    label {
+      font-weight: 600;
+      display: block;
+      margin-top: 15px;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border: none;
+      border-radius: 8px;
+      background: #3a3c5a;
+      color: #fff;
+      font-size: 15px;
+    }
+    button {
+      width: 100%;
+      margin-top: 25px;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      background: #00aaff;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.3s;
+      font-size: 16px;
+    }
+    button:hover {
+      background: #0088cc;
+    }
+    .result {
+      background: #202233;
+      border-radius: 10px;
+      padding: 20px;
+      margin-top: 30px;
+      display: none;
+    }
+    .bias-good { color: #4aff8c; }
+    .bias-bad { color: #ff5757; }
+    .tier-output {
+      font-size: 18px;
+      font-weight: bold;
+      color: #00d5ff;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Bloxd Tier Test Calculator</h1>
+    
+    <label>Tested Player's Name:</label>
+    <input id="testedPlayer" type="text">
+
+    <label>Tester Name:</label>
+    <input id="testerName" type="text">
+
+    <label>Tester Tier:</label>
+    <select id="testerTier">
+      <option value="">Select...</option>
+      <option>HT1</option><option>LT1</option>
+      <option>HT2</option><option>LT2</option>
+      <option>HT3</option><option>LT3</option>
+      <option>HT4</option><option>LT4</option>
+      <option>HT5</option><option>LT5</option>
+    </select>
+
+    <label>Match Score (e.g. 5-3):</label>
+    <input id="score" type="text" placeholder="5-3">
+
+    <label>HPs for each round (comma separated):</label>
+    <input id="hps" type="text" placeholder="Example: 15, 23, 9, 20, 0">
+
+    <label>Has this player been tested before?</label>
+    <select id="previousTest">
+      <option value="no">No</option>
+      <option value="yes">Yes</option>
+    </select>
+
+    <div id="previousTierBox" style="display:none;">
+      <label>Previous Tier:</label>
+      <select id="previousTier">
+        <option>HT1</option><option>LT1</option>
+        <option>HT2</option><option>LT2</option>
+        <option>HT3</option><option>LT3</option>
+        <option>HT4</option><option>LT4</option>
+        <option>HT5</option><option>LT5</option>
+      </select>
+    </div>
+
+    <label>Improvement Comment:</label>
+    <textarea id="comment" rows="3"></textarea>
+
+    <button onclick="calculateTier()">Calculate Tier</button>
+
+    <div class="result" id="resultBox">
+      <h2>Tier Test Summary</h2>
+      <p id="summaryText"></p>
+      <p class="tier-output" id="tierOutput"></p>
+      <p id="biasOutput"></p>
+    </div>
+  </div>
+
+  <script>
+    const tiers = ["HT1","LT1","HT2","LT2","HT3","LT3","HT4","LT4","HT5","LT5"];
+
+    document.getElementById("previousTest").addEventListener("change", function() {
+      document.getElementById("previousTierBox").style.display = this.value === "yes" ? "block" : "none";
+    });
+
+    function calculateTier() {
+      const testedPlayer = document.getElementById("testedPlayer").value.trim();
+      const testerName = document.getElementById("testerName").value.trim();
+      const testerTier = document.getElementById("testerTier").value;
+      const scoreInput = document.getElementById("score").value.trim();
+      const hpsInput = document.getElementById("hps").value.trim();
+      const previousTest = document.getElementById("previousTest").value;
+      const comment = document.getElementById("comment").value.trim();
+
+      if (!testedPlayer || !testerName || !testerTier || !scoreInput || !hpsInput) {
+        alert("Please fill out all fields before calculating.");
+        return;
+      }
+
+      let [pWins, tWins] = scoreInput.replace(/\s/g, "").split("-").map(Number);
+      if (isNaN(pWins) || isNaN(tWins) || (pWins !== 5 && tWins !== 5)) {
+        alert("Invalid score format. Example: 5-3");
+        return;
+      }
+
+      const hps = hpsInput.split(",").map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
+      const totalRounds = pWins + tWins;
+      if (hps.length !== totalRounds) {
+        alert("Number of HPs must match total rounds (" + totalRounds + ").");
+        return;
+      }
+
+      const avgHp = hps.reduce((a,b)=>a+b,0) / hps.length;
+      const tierChange = Math.floor(avgHp / 10);
+      const newIndex = Math.min(tiers.length - 1, Math.max(0, tiers.indexOf(testerTier) + tierChange));
+      const newTier = tiers[newIndex];
+
+      // Bias calculator
+      let biasText = "No previous test data — bias cannot be calculated.";
+      if (previousTest === "yes") {
+        const previousTier = document.getElementById("previousTier").value;
+        const oldIndex = tiers.indexOf(previousTier);
+        const diff = oldIndex - newIndex;
+        const percentChange = Math.abs(diff) * 10;
+        if (diff > 0) {
+          biasText = `<span class='bias-good'>Inflation detected: ${percentChange}% higher than before.</span>`;
+        } else if (diff < 0) {
+          biasText = `<span class='bias-bad'>Deflation detected: ${percentChange}% lower than before.</span>`;
+        } else {
+          biasText = "No inflation or deflation detected.";
+        }
+        if (percentChange >= 40) {
+          biasText += " <strong>(Possible tester bias detected!)</strong>";
+        }
+      }
+
+      // Show results
+      document.getElementById("resultBox").style.display = "block";
+      document.getElementById("summaryText").innerHTML = `
+        <strong>Tested Player:</strong> ${testedPlayer}<br>
+        <strong>Tester:</strong> ${testerName}<br>
+        <strong>Tester Tier:</strong> ${testerTier}<br>
+        <strong>Match Score:</strong> ${pWins}-${tWins}<br>
+        <strong>Average HP:</strong> ${avgHp.toFixed(2)}<br>
+        <strong>Comment:</strong> ${comment}
+      `;
+      document.getElementById("tierOutput").innerText = "Assigned Tier: " + newTier;
+      document.getElementById("biasOutput").innerHTML = biasText;
+    }
+  </script>
+</body>
+</html>
