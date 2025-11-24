@@ -88,18 +88,9 @@
       color: #000;
     }
 
-    #calcBtn:hover {
-      background: #ccc;
-    }
-
-    #resetBtn {
-      background: #444;
-      color: #fff;
-    }
-
-    #resetBtn:hover {
-      background: #666;
-    }
+    #calcBtn:hover { background: #ccc; }
+    #resetBtn { background: #444; color: #fff; }
+    #resetBtn:hover { background: #666; }
 
     .button-group {
       display: flex;
@@ -139,22 +130,11 @@
     }
 
     @media (max-width: 600px) {
-      .container {
-        padding: 20px;
-      }
-      .header img {
-        width: 110px;
-        height: 110px;
-      }
-      .header h1 {
-        font-size: 22px;
-      }
-      .button-group {
-        flex-direction: column;
-      }
-      button {
-        width: 100%;
-      }
+      .container { padding: 20px; }
+      .header img { width: 110px; height: 110px; }
+      .header h1 { font-size: 22px; }
+      .button-group { flex-direction: column; }
+      button { width: 100%; }
     }
   </style>
 </head>
@@ -229,81 +209,92 @@
       document.getElementById("previousTierBox").style.display = this.value === "yes" ? "block" : "none";
     });
 
-    function calculateTier() {
-      const testedPlayer = document.getElementById("testedPlayer").value.trim();
-      const testerName = document.getElementById("testerName").value.trim();
-      const testerTier = document.getElementById("testerTier").value;
-      const scoreInput = document.getElementById("score").value.trim();
-      const hpsInput = document.getElementById("hps").value.trim();
-      const previousTest = document.getElementById("previousTest").value;
-      const comment = document.getElementById("comment").value.trim();
+    function tierToNumber(tierStr){
+      const map={"HT1":1,"LT1":2,"HT2":3,"LT2":4,"HT3":5,"LT3":6,"HT4":7,"LT4":8,"HT5":9,"LT5":10};
+      return map[tierStr]||1;
+    }
 
-      if (!testedPlayer || !testerName || !testerTier || !scoreInput || !hpsInput) {
+    function numberToTier(num){
+      num=Math.min(Math.max(Math.round(num),1),10);
+      return tiers[num-1];
+    }
+
+    // Your exact formula
+    function hpToTier(testerTier, hp){
+      let z = (hp + 100) / 200;
+      let g = Math.pow(z, 1);
+      const epsilon = 1e-15;
+      g = Math.min(Math.max(g, epsilon), 1 - epsilon);
+      let tier = 3.5 * Math.log(g / (1 - g));
+      return tier + testerTier;
+    }
+
+    function calculateTier(){
+      const testedPlayer=document.getElementById("testedPlayer").value.trim();
+      const testerName=document.getElementById("testerName").value.trim();
+      const testerTierStr=document.getElementById("testerTier").value;
+      const scoreInput=document.getElementById("score").value.trim();
+      const hpsInput=document.getElementById("hps").value.trim();
+      const previousTest=document.getElementById("previousTest").value;
+      const comment=document.getElementById("comment").value.trim();
+
+      if(!testedPlayer||!testerName||!testerTierStr||!scoreInput||!hpsInput){
         alert("Please fill out all fields before calculating.");
         return;
       }
 
-      const score = scoreInput.replace(/\s/g, "").split("-");
-      if (score.length !== 2) {
-        alert("Invalid score format. Example: 5-3");
-        return;
+      const score=scoreInput.replace(/\s/g,"").split("-");
+      if(score.length!==2){alert("Invalid score format. Example: 5-3");return;}
+
+      const pWins=parseInt(score[0]);
+      const tWins=parseInt(score[1]);
+      if(isNaN(pWins)||isNaN(tWins)||(pWins!==5&&tWins!==5)){
+        alert("Invalid score format. One player must have 5 wins."); return;
       }
 
-      const pWins = parseInt(score[0]);
-      const tWins = parseInt(score[1]);
-      if (isNaN(pWins) || isNaN(tWins) || (pWins !== 5 && tWins !== 5)) {
-        alert("Invalid score format. One player must have 5 wins.");
-        return;
+      const hps=hpsInput.split(",").map(v=>parseFloat(v.trim())).filter(v=>!isNaN(v));
+      const totalRounds=pWins+tWins;
+      if(hps.length!==totalRounds){alert("Number of HP values must equal total rounds ("+totalRounds+")."); return;}
+
+      const testerTierNum=tierToNumber(testerTierStr);
+      const avgHp=hps.reduce((a,b)=>a+b,0)/hps.length;
+
+      // Use your formula
+      const finalTierNum=hpToTier(testerTierNum, avgHp);
+      const cappedTierNum=Math.min(Math.max(Math.round(finalTierNum),1),10);
+      const newTierStr=numberToTier(cappedTierNum);
+
+      let biasText="No previous test data — bias cannot be calculated.";
+      if(previousTest==="yes"){
+        const previousTier=document.getElementById("previousTier").value;
+        const oldIndex=tiers.indexOf(previousTier);
+        const diff=oldIndex-(cappedTierNum-1);
+        const percentChange=Math.abs(diff)*10;
+        if(diff>0) biasText=`<span class='bias-good'>Inflation detected: ${percentChange}% higher than before.</span>`;
+        else if(diff<0) biasText=`<span class='bias-bad'>Deflation detected: ${percentChange}% lower than before.</span>`;
+        else biasText="No inflation or deflation detected.";
+        if(percentChange>=40) biasText+=" <strong>(Possible tester bias detected!)</strong>";
       }
 
-      const hps = hpsInput.split(",").map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
-      const totalRounds = pWins + tWins;
-      if (hps.length !== totalRounds) {
-        alert("Number of HP values must equal total rounds (" + totalRounds + ").");
-        return;
-      }
-
-      const avgHp = hps.reduce((a,b)=>a+b,0) / hps.length;
-      const tierChange = Math.floor(avgHp / 10);
-      const testerIndex = tiers.indexOf(testerTier);
-      const newIndex = Math.min(tiers.length - 1, Math.max(0, testerIndex + tierChange));
-      const newTier = tiers[newIndex];
-
-      let biasText = "No previous test data — bias cannot be calculated.";
-      if (previousTest === "yes") {
-        const previousTier = document.getElementById("previousTier").value;
-        const oldIndex = tiers.indexOf(previousTier);
-        const diff = oldIndex - newIndex;
-        const percentChange = Math.abs(diff) * 10;
-        if (diff > 0) {
-          biasText = `<span class='bias-good'>Inflation detected: ${percentChange}% higher than before.</span>`;
-        } else if (diff < 0) {
-          biasText = `<span class='bias-bad'>Deflation detected: ${percentChange}% lower than before.</span>`;
-        } else {
-          biasText = "No inflation or deflation detected.";
-        }
-        if (percentChange >= 40) biasText += " <strong>(Possible tester bias detected!)</strong>";
-      }
-
-      document.getElementById("resultBox").style.display = "block";
-      document.getElementById("summaryText").innerHTML = `
+      document.getElementById("resultBox").style.display="block";
+      document.getElementById("summaryText").innerHTML=`
         <strong>Tested Player:</strong> ${testedPlayer}<br>
         <strong>Tester:</strong> ${testerName}<br>
-        <strong>Tester Tier:</strong> ${testerTier}<br>
+        <strong>Tester Tier:</strong> ${testerTierStr}<br>
         <strong>Match Score:</strong> ${pWins}-${tWins}<br>
         <strong>Average HP:</strong> ${avgHp.toFixed(2)}<br>
         <strong>Comment:</strong> ${comment}
       `;
-      document.getElementById("tierOutput").innerText = "Assigned Tier: " + newTier;
-      document.getElementById("biasOutput").innerHTML = biasText;
+      document.getElementById("tierOutput").innerText="Assigned Tier: "+newTierStr;
+      document.getElementById("biasOutput").innerHTML=biasText;
     }
 
-    function resetForm() {
-      document.querySelectorAll("input, textarea").forEach(el => el.value = "");
-      document.getElementById("testerTier").selectedIndex = 0;
-      document.getElementById("previousTest").selectedIndex = 0;
-      document.getElementById("previousTierBox").style.display = "none";
-      document.getElementById("resultBox").style.display = "none";
+    function resetForm(){
+      document.querySelectorAll("input,textarea").forEach(el=>el.value="");
+      document.getElementById("testerTier").selectedIndex=0;
+      document.getElementById("previousTest").selectedIndex=0;
+      document.getElementById("previousTierBox").style.display="none";
+      document.getElementById("resultBox").style.display="none";
     }
   </script>
 </body>
